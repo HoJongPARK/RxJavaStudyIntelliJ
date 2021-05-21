@@ -2,10 +2,17 @@ package Study;
 
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
+import io.reactivex.Single;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.subjects.AsyncSubject;
+import io.reactivex.subjects.BehaviorSubject;
 import model.USER;
 
+import javax.security.auth.Subject;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.concurrent.Callable;
 
 public class ObservableStudy {
     public static void main(String[] args) throws IOException {
@@ -40,11 +47,58 @@ public class ObservableStudy {
         //Array에 있는 데이터를 발행하는 Observable 객체를 생성하는 fromArray함수
         Observable<USER> userObservable = Observable.fromArray(users);
 
-        userObservable.subscribe(v-> System.out.println(v.userAge+" "+v.userName));
+        userObservable.subscribe(v-> System.out.println(v.getUserAge()+" "+v.getUserName()));
         Disposable disposable2 = userObservable.subscribe(v -> {
-            v.userAge+=5;
-            System.out.println(v.userAge);
+            System.out.println(v.getUserAge());
         });
 
+        //Single Class 는 데이터를 한 개만 발행하는 Observable 클래스로 , 발행과 동시에 종료된다. onSuccess 와 onError 함수로만 구성된다.
+        Single<String> single = Single.just("Hello RxJava");
+        single.subscribe(v-> System.out.println(v));
+
+        Callable<String> callable = new Callable<String>() {
+            @Override
+            public String call() throws Exception {
+                Thread.sleep(1000);
+                return "hello RxJava";
+            }
+        };
+        Observable.fromCallable(callable).subscribe(v-> System.out.println(v));
+
+        // 이 때까지 다룬 Observable 객체는 전부 차가운 Observable 이다. -> just, fromCallable, fromArray등 Observable 객체를 생성해도
+        // 구독자가 존재하지 않는다면 데이터를 발행하지 않는다.
+        // 뜨거운 Observable 은 객체를 생성할 때부터 데이터를 발행한다. 이 경우 배압(발행 속도와 그 데이터를 처리하는 속도가 너무 차이날 때) 을 별도로 처리해줘야한다.
+
+        //Subject 클래스는 발행자의 속성과 구독자의 속성이 모두 존재한다.
+        AsyncSubject<Integer> asyncSubject = AsyncSubject.create();
+        asyncSubject.onNext(2);
+        asyncSubject.onNext(3);
+        asyncSubject.subscribe(v-> System.out.println(v));
+
+        asyncSubject.onNext(5);
+        asyncSubject.subscribe(v-> System.out.println(v));
+
+        asyncSubject.onComplete();
+        //AsyncSubject 클래스는 onComplete 가 불릴 시 마지막으로 발행된 데이터만 처리하는 클래스이다.
+
+        AsyncSubject<String> asyncSubject1 = AsyncSubject.create();
+
+        //Subject 클래스는 Observable 클래스를 상속함과 동시에 인터페이스를 구현하기 때문에, 구독자 , 발행자로서의 역할을 동시에 수행 가능하다.
+        asyncSubject1.subscribe(v-> System.out.println(v));
+        Observable.fromCallable(callable).subscribe(asyncSubject1);
+        BehaviorSubject<String> behaviorSubject = BehaviorSubject.createDefault("Hello RxJava");
+        behaviorSubject.subscribe(v-> System.out.println(v));
+
+        behaviorSubject.onNext("Build a Bitch");
+        behaviorSubject.subscribe(v->System.out.println(v));
+        behaviorSubject.onNext("Spiral");
+        behaviorSubject.subscribe(v->System.out.println(v));
+        //BeHaviorSubject 클래스는 가장 최근에 발행된 혹은 기본 데이터를 구독자에게 발행한다.
+        behaviorSubject.onComplete();
+        //map 함수는 해당 mapping 함수를 각 데이터에 적용해 발행한다는 의미다.
+        Observable<USER> mapObservable = Observable.fromArray(users)
+                .map(v-> { v.setFavoriteSong("spiral");
+                return v; });
+        mapObservable.subscribe(v->v.printUserInfo());
     }
 }
